@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { createPartFromUri, createUserContent, GoogleGenAI } from "@google/genai";
 import express from "express";
 import multer from "multer";
 import cors from "cors";
@@ -8,7 +8,7 @@ import extractText from "./utils/utils.mjs";
 
 const app = express();
 const upload = multer();
-const ai = new GoogleGenAI({});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // inisialisasi model gemini
 const geminiModels = {
@@ -49,6 +49,37 @@ app.post("/api/generate-text", async (req, res) => {
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message });
+  }
+});
+
+app.post("/api/generate-from-image", upload.single("image"), async (req, res) => {
+  try {
+    const { prompt = "describe the uploaded image" } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ message: "Image file is required." });
+    }
+
+    const buffer = req.file.buffer.toString("base64");
+
+    const response = await ai.models.generateContent({
+      model: geminiModels.image,
+      contents: [
+        { text: prompt },
+        { inlineData: { mimeType: req.file.mimetype, data: buffer} }
+      ],
+    });
+    return res.status(200).json({ result: extractText(response) });
+
+  } catch (error) {
+    console.error("Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message});
+  } finally {
+    // Hapus file yang diupload untuk menghemat ruang penyimpanan
+    if (req.file && req.file.path) {
+      await fs.unlink(req.file.path);
+    }
   }
 });
 
