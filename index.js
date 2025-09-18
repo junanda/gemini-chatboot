@@ -4,6 +4,7 @@ import multer from "multer";
 import cors from "cors";
 import fs from "fs/promises";
 import "dotenv/config";
+import extractText from "./utils/utils.mjs";
 
 const app = express();
 const upload = multer();
@@ -42,7 +43,7 @@ app.post("/api/generate-text", async (req, res) => {
     });
 
     // kirim response ke client
-    return res.status(200).json({ replay: resposne.text });
+    return res.status(200).json({ result: extractText(resposne) });
   } catch (error) {
     console.error("Error:", error);
     return res
