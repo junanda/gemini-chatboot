@@ -125,6 +125,43 @@ app.post('/api/generate-from-document', upload.single('document'), async (req, r
   }
 });
 
+app.post('/api/generate-from-audio', upload.single('audio'), async (req, res) => {
+  try {
+    const { prompt = "transcribe the uploaded audio" } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ message: "Audio file is required." });
+    }
+
+    const audioBase64 = req.file.buffer.toString('base64');
+
+    const response = await ai.models.generateContent({
+      model: geminiModels.audio,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt || "transcribe this audio:" },
+            { inlineData: { mimeType: req.file.mimetype, data: audioBase64 } }
+          ]
+        }
+      ],
+    });
+
+    return res.status(200).json({ result: extractText(response) });
+
+  } catch (error) {
+    console.error("Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
+  } finally {
+    // Hapus file yang diupload untuk menghemat ruang penyimpanan
+    if (req.file && req.file.path) {
+      await fs.unlink(req.file.path);
+    }
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.info(`Server is running on http://localhost:${PORT}`);
