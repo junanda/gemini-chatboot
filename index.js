@@ -1,4 +1,4 @@
-import { createPartFromUri, createUserContent, GoogleGenAI } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import express from "express";
 import multer from "multer";
 import cors from "cors";
@@ -64,8 +64,13 @@ app.post("/api/generate-from-image", upload.single("image"), async (req, res) =>
     const response = await ai.models.generateContent({
       model: geminiModels.image,
       contents: [
-        { text: prompt },
-        { inlineData: { mimeType: req.file.mimetype, data: buffer} }
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: req.file.mimetype, data: buffer } }
+          ]
+        }
       ],
     });
     return res.status(200).json({ result: extractText(response) });
@@ -75,6 +80,43 @@ app.post("/api/generate-from-image", upload.single("image"), async (req, res) =>
     return res
       .status(500)
       .json({ message: "Internal Server Error", error: error.message});
+  } finally {
+    // Hapus file yang diupload untuk menghemat ruang penyimpanan
+    if (req.file && req.file.path) {
+      await fs.unlink(req.file.path);
+    }
+  }
+});
+
+app.post('/api/generate-from-document', upload.single('document'), async (req, res) => {
+  try {
+    const { prompt = "summarize the uploaded document" } = req.body;
+    if (!req.file) {
+      return res.status(400).json({ message: "Document file is required." });
+    }
+
+    const docBase64 = req.file.buffer.toString('base64');
+
+    const response = await ai.models.generateContent({
+      model: geminiModels.document,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt || "summarize this document:" },
+            { inlineData: { mimeType: req.file.mimetype, data: docBase64 } }
+          ]
+        }
+      ],
+    });
+
+    return res.status(200).json({ result: extractText(response) });
+
+  } catch (error) {
+    console.error("Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Internal Server Error", error: error.message });
   } finally {
     // Hapus file yang diupload untuk menghemat ruang penyimpanan
     if (req.file && req.file.path) {
